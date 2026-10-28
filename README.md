@@ -1,4 +1,12 @@
 # smart-farm-management-
+
+#Group members
+PETER CHIBWE BIT23117599
+
+
+
+
+
 An Intelligent Farm Management System (IFMS) providing a centralized, web-based platform to manage agricultural operations, crop and livestock production, inventory, and farm finances.
 
 The Full Farm Management System is one application, not five separate ones stitched together — so it runs on one shared MySQL database, and every module reads and writes to that same database.
