@@ -330,6 +330,14 @@ export default function NotificationsManagement() {
                 )}
 
                 {tab === 'rules' && (
+                    <p className="mb-3 rounded-2xl bg-farm-50 px-4 py-3 text-sm text-farm-900">
+                        Extreme weather (heat, frost, strong wind, heavy rain, thunderstorms) is checked every hour for
+                        every farm with a location, and warns the farm owner and managers automatically. You only need a
+                        weather rule if you also want milder warnings, such as rain.
+                    </p>
+                )}
+
+                {tab === 'rules' && (
                     <div className="overflow-hidden rounded-3xl bg-white shadow-[0_2px_16px_rgba(15,60,35,0.07)]">
                         <table className="w-full text-left text-sm">
                             <thead className="bg-farm-50 text-slate-500">

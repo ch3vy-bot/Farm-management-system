@@ -7,6 +7,7 @@ use App\Models\Farm;
 use App\Models\Notification;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -132,6 +133,163 @@ class AlertRuleEvaluator
         ]);
 
         return true;
+    }
+
+    // ---- Automatic extreme-weather alerts (no rule needed) ----
+
+    /** Forecast values at or beyond these count as extreme. */
+    private const HEAT_C = 35;      // temperature at or above
+    private const COLD_C = 3;       // temperature at or below (frost risk)
+    private const WIND_MS = 15;     // wind speed in m/s at or above
+    private const HEAVY_RAIN_MM = 20; // rain in a 3-hour slot at or above
+
+    /**
+     * Check the forecast of every farm that has coordinates and warn about extreme weather.
+     * Farms with their own active "weather" rule are skipped; that rule already covers them.
+     * Returns notifications created.
+     */
+    public function runExtremeWeather(?int $farmId = null): int
+    {
+        $ruleFarmIds = AlertRule::where('is_active', true)->get()
+            ->filter(fn ($r) => AlertRule::normalizeType($r->type) === 'weather')
+            ->pluck('farm_id')
+            ->all();
+
+        $farms = Farm::query()->whereNotNull('latitude')->whereNotNull('longitude');
+
+        if ($farmId !== null) {
+            $farms->where('id', $farmId);
+        }
+
+        $created = 0;
+
+        foreach ($farms->get() as $farm) {
+            if (in_array($farm->id, $ruleFarmIds, true)) {
+                continue;
+            }
+
+            try {
+                $hazards = $this->extremeHazards($farm);
+            } catch (\Throwable $e) {
+                Log::error("Extreme weather check failed for farm {$farm->id}: ".$e->getMessage());
+
+                continue;
+            }
+
+            if ($hazards === []) {
+                continue;
+            }
+
+            foreach ($this->weatherRecipients($farm) as $userId) {
+                foreach ($hazards as $hazard) {
+                    if ($this->notify($userId, $farm, 'weather', $hazard['title'], $hazard['message'], 'Urgent')) {
+                        $created++;
+                    }
+                }
+            }
+        }
+
+        return $created;
+    }
+
+    /**
+     * Scan the forecast and return one summary per kind of extreme (worst slot of each kind).
+     */
+    private function extremeHazards(Farm $farm): array
+    {
+        $forecast = Cache::remember(
+            "forecast:{$farm->latitude}:{$farm->longitude}",
+            now()->addMinutes(30),
+            fn () => $this->weather->getForecast($farm->latitude, $farm->longitude)
+        );
+
+        $worst = [];
+
+        foreach ($forecast['list'] ?? [] as $slot) {
+            try {
+                $when = Carbon::parse($slot['dt_txt'] ?? 'now')->format('D j M');
+            } catch (\Throwable $e) {
+                $when = 'soon';
+            }
+
+            $temp = $slot['main']['temp'] ?? null;
+            $min = $slot['main']['temp_min'] ?? $temp;
+            $wind = $slot['wind']['speed'] ?? null;
+            $rain = $slot['rain']['3h'] ?? 0;
+            $code = (int) ($slot['weather'][0]['id'] ?? 0);
+            $pop = $slot['pop'] ?? 0;
+
+            if ($temp !== null && $temp >= self::HEAT_C && $temp > ($worst['heat']['value'] ?? -INF)) {
+                $worst['heat'] = ['value' => $temp, 'when' => $when];
+            }
+            if ($min !== null && $min <= self::COLD_C && $min < ($worst['cold']['value'] ?? INF)) {
+                $worst['cold'] = ['value' => $min, 'when' => $when];
+            }
+            if ($wind !== null && $wind >= self::WIND_MS && $wind > ($worst['wind']['value'] ?? -INF)) {
+                $worst['wind'] = ['value' => $wind, 'when' => $when];
+            }
+            if ($rain >= self::HEAVY_RAIN_MM && $rain > ($worst['rain']['value'] ?? -INF)) {
+                $worst['rain'] = ['value' => $rain, 'when' => $when];
+            }
+            if ($code >= 200 && $code <= 232 && $pop >= 0.5 && ! isset($worst['storm'])) {
+                $worst['storm'] = ['value' => 0, 'when' => $when];
+            }
+        }
+
+        $hazards = [];
+
+        if (isset($worst['heat'])) {
+            $hazards[] = [
+                'title' => "Extreme heat expected: {$farm->name}",
+                'message' => 'Temperatures up to '.round($worst['heat']['value'])."°C expected around {$worst['heat']['when']}. Check irrigation and shade for livestock.",
+            ];
+        }
+        if (isset($worst['cold'])) {
+            $hazards[] = [
+                'title' => "Frost risk: {$farm->name}",
+                'message' => 'Temperatures as low as '.round($worst['cold']['value'])."°C expected around {$worst['cold']['when']}. Protect sensitive crops and young animals.",
+            ];
+        }
+        if (isset($worst['wind'])) {
+            $hazards[] = [
+                'title' => "Strong winds expected: {$farm->name}",
+                'message' => 'Winds up to '.round($worst['wind']['value'])." m/s expected around {$worst['wind']['when']}. Secure equipment and avoid spraying.",
+            ];
+        }
+        if (isset($worst['rain'])) {
+            $hazards[] = [
+                'title' => "Heavy rain expected: {$farm->name}",
+                'message' => 'About '.round($worst['rain']['value'])." mm of rain in 3 hours expected around {$worst['rain']['when']}. Watch for flooding and delay spraying or harvest.",
+            ];
+        }
+        if (isset($worst['storm'])) {
+            $hazards[] = [
+                'title' => "Thunderstorm expected: {$farm->name}",
+                'message' => "Thunderstorms are likely around {$worst['storm']['when']}. Keep workers and animals safe.",
+            ];
+        }
+
+        return $hazards;
+    }
+
+    /**
+     * Farm owner plus the farm's managers and admins; falls back to all admins.
+     */
+    private function weatherRecipients(Farm $farm): array
+    {
+        $staff = DB::table('employees as e')
+            ->join('users as u', 'u.id', '=', 'e.user_id')
+            ->where('e.farm_id', $farm->id)
+            ->whereIn('u.role', ['Admin', 'Manager', 'Farm-owner'])
+            ->pluck('u.id');
+
+        $ids = collect([$farm->owner_id])->merge($staff)->filter()->unique()->values();
+
+        if ($ids->isEmpty()) {
+            $ids = User::where('role', 'Admin')->pluck('id');
+        }
+
+        return $ids->all();
     }
 
     // ---- Checks. Each returns a list of ['title' => ..., 'message' => ..., 'priority' => optional]. ----

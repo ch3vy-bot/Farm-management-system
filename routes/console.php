@@ -10,3 +10,6 @@ Artisan::command('inspire', function () {
 
 // Check every active alert rule and create notifications for any that trigger.
 Schedule::command('alerts:evaluate')->everyFiveMinutes();
+
+// Automatic extreme-weather warnings for every farm with coordinates (no rule needed).
+Schedule::command('alerts:weather')->hourly();

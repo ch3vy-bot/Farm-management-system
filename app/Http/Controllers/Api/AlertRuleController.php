@@ -101,7 +101,7 @@ class AlertRuleController extends Controller
         $farmId = $request->filled('farm_id') ? (int) $request->input('farm_id') : null;
 
         return response()->json([
-            'created' => $this->evaluator->runAll($farmId),
+            'created' => $this->evaluator->runAll($farmId) + $this->evaluator->runExtremeWeather($farmId),
         ]);
     }
 }
