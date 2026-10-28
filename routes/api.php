@@ -143,5 +143,6 @@ Route::middleware(['auth:sanctum', 'farm.access'])->group(function () {
     // Notifications & Alerts
     Route::apiResource('notifications', NotificationController::class)->middleware('module:notifications');
     Route::post('notifications/{notification}/mark-as-read', [NotificationController::class, 'markAsRead'])->middleware('module:notifications');
+    Route::post('alert-rules/evaluate', [AlertRuleController::class, 'evaluate'])->middleware('module:notifications');
     Route::apiResource('alert-rules', AlertRuleController::class)->middleware('module:notifications');
 });

@@ -1,9 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import ModuleLayout from '../components/ModuleLayout.jsx';
 
 const emptyNotification = { farm_id: '', type: '', title: '', message: '', priority: 'Normal' };
-const emptyRule = { farm_id: '', type: '', trigger_condition: '', is_active: true };
+const emptyRule = { farm_id: '', type: 'low_stock', threshold: 50, priority: 'Normal', is_active: true };
+
+// Rule types the server knows how to check. `unit` describes what the number means.
+const ruleTypes = {
+    low_stock: { label: 'Low stock', unit: 'units remaining', default: 50 },
+    maintenance_due: { label: 'Equipment maintenance due', unit: 'days ahead', default: 7 },
+    vaccination_due: { label: 'Livestock vaccination due', unit: 'days ahead', default: 7 },
+    harvest_due: { label: 'Harvest coming up', unit: 'days ahead', default: 3 },
+    task_overdue: { label: 'Overdue tasks', unit: 'days overdue', default: 1 },
+    weather: { label: 'Weather alert', unit: null, default: null },
+};
+
+const REFRESH_MS = 30000;
 
 const inputClass =
     'mt-1 w-full rounded-xl border border-farm-200 px-3 py-2 text-sm outline-none focus:border-farm-500 focus:ring-2 focus:ring-farm-500/20';
@@ -27,10 +39,45 @@ export default function NotificationsManagement() {
     const [ruleModal, setRuleModal] = useState(false);
     const [notificationForm, setNotificationForm] = useState(emptyNotification);
     const [ruleForm, setRuleForm] = useState(emptyRule);
+    const [toast, setToast] = useState(null);
+    const [checking, setChecking] = useState(false);
+    const knownIds = useRef(null);
 
     useEffect(() => {
         fetchAll();
+        const timer = setInterval(refreshNotifications, REFRESH_MS);
+        return () => clearInterval(timer);
     }, []);
+
+    useEffect(() => {
+        if (!toast) return undefined;
+        const t = setTimeout(() => setToast(null), 6000);
+        return () => clearTimeout(t);
+    }, [toast]);
+
+    // Show a pop-up for any unread notification we haven't seen yet.
+    function announceNew(list) {
+        if (knownIds.current === null) {
+            knownIds.current = new Set(list.map((n) => n.id));
+            return;
+        }
+        const fresh = list.filter((n) => !knownIds.current.has(n.id) && !n.read_at);
+        list.forEach((n) => knownIds.current.add(n.id));
+        if (fresh.length === 1) setToast(`${fresh[0].title}`);
+        else if (fresh.length > 1) setToast(`${fresh.length} new notifications`);
+    }
+
+    // Quiet background refresh (no loading spinner).
+    async function refreshNotifications() {
+        try {
+            const res = await api.get('/api/notifications');
+            const list = res.data.data ?? res.data;
+            announceNew(list);
+            setNotifications(list);
+        } catch (err) {
+            // Ignore: the next refresh will try again.
+        }
+    }
 
     async function fetchAll() {
         setLoading(true);
@@ -40,7 +87,9 @@ export default function NotificationsManagement() {
                 api.get('/api/notifications'),
                 api.get('/api/alert-rules'),
             ]);
-            setNotifications(notificationsRes.data.data ?? notificationsRes.data);
+            const list = notificationsRes.data.data ?? notificationsRes.data;
+            announceNew(list);
+            setNotifications(list);
             setRules(rulesRes.data.data ?? rulesRes.data);
         } catch (err) {
             setError('Could not load notifications and alert rules. Check that the API is running and you are logged in.');
@@ -87,12 +136,37 @@ export default function NotificationsManagement() {
     async function handleCreateRule(e) {
         e.preventDefault();
         try {
-            await api.post('/api/alert-rules', ruleForm);
+            const res = await api.post('/api/alert-rules', {
+                ...ruleForm,
+                threshold: ruleForm.threshold === '' ? null : Number(ruleForm.threshold),
+            });
             setRuleModal(false);
             setRuleForm(emptyRule);
-            fetchAll();
+            await fetchAll();
+            const made = res.data?.notifications_created ?? 0;
+            setToast(
+                made > 0
+                    ? `Rule saved. ${made} notification(s) raised right away.`
+                    : 'Rule saved. Nothing matches it right now; you will be notified when it does.'
+            );
+            if (made > 0) setTab('notifications');
         } catch (err) {
             alert(err.response?.data?.message || 'Could not create the alert rule.');
+        }
+    }
+
+    async function handleCheckNow() {
+        setChecking(true);
+        try {
+            const res = await api.post('/api/alert-rules/evaluate');
+            await fetchAll();
+            const made = res.data?.created ?? 0;
+            setToast(made > 0 ? `${made} new notification(s).` : 'Checked all active rules. Nothing new to report.');
+            if (made > 0) setTab('notifications');
+        } catch (err) {
+            alert('Could not check the alert rules.');
+        } finally {
+            setChecking(false);
         }
     }
 
@@ -123,6 +197,15 @@ export default function NotificationsManagement() {
           title="Notifications and alerts"
           subtitle="See what needs attention, and set the rules that trigger alerts for each farm."
           actions={<>
+                    {tab === 'rules' && (
+                        <button
+                            onClick={handleCheckNow}
+                            disabled={checking}
+                            className="mr-2 rounded-full border border-farm-200 px-5 py-2 text-sm font-medium text-farm-900 transition hover:bg-farm-50 disabled:opacity-60"
+                        >
+                            {checking ? 'Checking...' : 'Check rules now'}
+                        </button>
+                    )}
 <button
                         onClick={() => (tab === 'notifications' ? setNotificationModal(true) : setRuleModal(true))}
                         className="rounded-full bg-harvest-400 px-5 py-2 text-sm font-medium text-farm-900 transition hover:bg-harvest-500 disabled:opacity-60"
@@ -132,6 +215,11 @@ export default function NotificationsManagement() {
           </>}
         >
             <div className="mx-auto max-w-7xl">
+                {toast && (
+                    <div className="fixed right-4 top-4 z-[60] max-w-sm rounded-2xl bg-farm-900 px-5 py-3 text-sm text-white shadow-xl">
+                        {toast}
+                    </div>
+                )}
 
                 <div className="mb-4 flex gap-2 border-b border-farm-100">
                     <button
@@ -191,7 +279,7 @@ export default function NotificationsManagement() {
                                             <td colSpan="5" className="px-6 py-10 text-center text-slate-500">
                                                 {unreadOnly
                                                     ? 'No unread notifications.'
-                                                    : 'Nothing here yet. Add a notification to see how alerts will look.'}
+                                                    : 'No notifications yet. They appear here automatically when one of your alert rules triggers.'}
                                             </td>
                                         </tr>
                                     ) : (
@@ -269,7 +357,7 @@ export default function NotificationsManagement() {
                                 ) : (
                                     rules.map((rule) => (
                                         <tr key={rule.id}>
-                                            <td className="px-6 py-4 font-medium text-farm-900">{rule.type}</td>
+                                            <td className="px-6 py-4 font-medium text-farm-900">{ruleTypes[rule.type]?.label ?? rule.type}</td>
                                             <td className="px-6 py-4 text-slate-500">{rule.trigger_condition}</td>
                                             <td className="px-6 py-4 text-slate-500">{rule.farm_id}</td>
                                             <td className="px-6 py-4">
@@ -398,23 +486,51 @@ export default function NotificationsManagement() {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-farm-900">Alert type</label>
-                                    <input
+                                    <select
                                         className={inputClass}
-                                        placeholder="e.g. low_stock, vaccination_due"
                                         value={ruleForm.type}
-                                        onChange={(e) => setRuleForm({ ...ruleForm, type: e.target.value })}
-                                        required
-                                    />
+                                        onChange={(e) =>
+                                            setRuleForm({
+                                                ...ruleForm,
+                                                type: e.target.value,
+                                                threshold: ruleTypes[e.target.value].default ?? '',
+                                            })
+                                        }
+                                    >
+                                        {Object.entries(ruleTypes).map(([key, t]) => (
+                                            <option key={key} value={key}>
+                                                {t.label}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
+                                {ruleTypes[ruleForm.type].unit && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-farm-900">
+                                            Trigger level ({ruleTypes[ruleForm.type].unit})
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            className={inputClass}
+                                            value={ruleForm.threshold}
+                                            onChange={(e) => setRuleForm({ ...ruleForm, threshold: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                )}
                                 <div>
-                                    <label className="block text-sm font-medium text-farm-900">Triggers when</label>
-                                    <input
+                                    <label className="block text-sm font-medium text-farm-900">Priority of the alert</label>
+                                    <select
                                         className={inputClass}
-                                        placeholder="e.g. stock falls below minimum"
-                                        value={ruleForm.trigger_condition}
-                                        onChange={(e) => setRuleForm({ ...ruleForm, trigger_condition: e.target.value })}
-                                        required
-                                    />
+                                        value={ruleForm.priority}
+                                        onChange={(e) => setRuleForm({ ...ruleForm, priority: e.target.value })}
+                                    >
+                                        <option value="Low">Low</option>
+                                        <option value="Normal">Normal</option>
+                                        <option value="High">High</option>
+                                        <option value="Urgent">Urgent</option>
+                                    </select>
                                 </div>
                                 <label className="flex items-center gap-2 text-sm text-farm-900">
                                     <input
