@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import ModuleLayout from '../components/ModuleLayout.jsx';
+import { money } from '../utils/currency.js';
 
 export default function EmployeeManagement() {
     const { api } = useAuth();
@@ -124,7 +125,7 @@ export default function EmployeeManagement() {
                                         </td>
                                         <td className="px-6 py-4 text-slate-500">{emp.farm?.name}</td>
                                         <td className="px-6 py-4 text-slate-500">{emp.task_assignment || 'Not assigned'}</td>
-                                        <td className="px-6 py-4 text-slate-500">${emp.hourly_rate}/hr</td>
+                                        <td className="px-6 py-4 text-slate-500">{money(emp.hourly_rate)}/hr</td>
                                         <td className="px-6 py-4 text-right space-x-3">
                                             <button
                                                 onClick={() => handleOpenModal(emp)}
@@ -191,7 +192,7 @@ export default function EmployeeManagement() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-farm-900">Hourly Rate ($)</label>
+                                    <label className="block text-sm font-medium text-farm-900">Hourly Rate (K)</label>
                                     <input
                                         type="number"
                                         step="0.01"

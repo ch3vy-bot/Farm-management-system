@@ -1,11 +1,10 @@
 import React, { Fragment, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import ModuleLayout from '../components/ModuleLayout.jsx';
+import { money } from '../utils/currency.js';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const suffix = () => Date.now().toString().slice(-6);
-const money = (n) =>
-    Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const defaults = {
     customer: () => ({ farm_id: '', name: '', contact_phone: '', contact_email: '', address: '', customer_type: 'Individual' }),

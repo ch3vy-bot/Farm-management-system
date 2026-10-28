@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import ModuleLayout from '../components/ModuleLayout.jsx';
+import { money } from '../utils/currency.js';
 
 export default function ExpenseTracking() {
     const { api } = useAuth();
@@ -128,7 +129,7 @@ export default function ExpenseTracking() {
                                         <td className="px-6 py-4 font-medium text-farm-900">{exp.farm?.name}</td>
                                         <td className="px-6 py-4 text-slate-500">{exp.category}</td>
                                         <td className="px-6 py-4 text-slate-500">{exp.description || 'N/A'}</td>
-                                        <td className="px-6 py-4 font-medium text-farm-900">${exp.amount}</td>
+                                        <td className="px-6 py-4 font-medium text-farm-900">{money(exp.amount)}</td>
                                         <td className="px-6 py-4 text-right space-x-3">
                                             <button
                                                 onClick={() => handleOpenModal(exp)}
@@ -188,7 +189,7 @@ export default function ExpenseTracking() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-farm-900">Amount ($)</label>
+                                    <label className="block text-sm font-medium text-farm-900">Amount (K)</label>
                                     <input
                                         type="number"
                                         step="0.01"

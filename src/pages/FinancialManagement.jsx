@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import ModuleLayout from '../components/ModuleLayout.jsx';
+import { money } from '../utils/currency.js';
 
 const EXPENSE_CATEGORIES = ['input_cost', 'labour_cost', 'fuel_cost', 'equipment_cost', 'vet_cost', 'loan_repayment', 'other_expense'];
 const INCOME_CATEGORIES = ['sale_income', 'loan_received', 'other_income'];
@@ -9,7 +10,6 @@ const input = 'mt-1 w-full rounded-xl border border-farm-200 px-3 py-2 text-sm o
 const primaryBtn = 'rounded-full bg-farm-700 px-5 py-2 text-sm font-medium text-white transition hover:bg-farm-800';
 const ghostBtn = 'rounded-full border border-farm-200 px-4 py-2 text-sm font-medium text-slate-500 transition hover:bg-farm-50';
 const label = (s) => s.replace(/_/g, ' ');
-const money = (n) => `$${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const today = () => new Date().toISOString().slice(0, 10);
 
 function errorText(err, fallback) {
@@ -243,7 +243,7 @@ export default function FinanceManagement() {
                                 {tab === 'transactions' ? (
                                     <>
                                         <div>
-                                            <label className="block text-sm font-medium text-farm-900">Amount ($)</label>
+                                            <label className="block text-sm font-medium text-farm-900">Amount (K)</label>
                                             <input type="number" step="0.01" min="0.01" className={input} value={form.amount} required
                                                 onChange={(e) => setForm({ ...form, amount: e.target.value })} />
                                         </div>
@@ -272,7 +272,7 @@ export default function FinanceManagement() {
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-farm-900">Planned amount ($)</label>
+                                            <label className="block text-sm font-medium text-farm-900">Planned amount (K)</label>
                                             <input type="number" step="0.01" min="0" className={input} value={form.planned_amount} required
                                                 onChange={(e) => setForm({ ...form, planned_amount: e.target.value })} />
                                         </div>

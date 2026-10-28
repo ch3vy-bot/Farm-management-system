@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import ModuleLayout from '../components/ModuleLayout.jsx';
+import { money } from '../utils/currency.js';
 
 const TYPES = ['tractor', 'harvester', 'sprayer', 'pump', 'vehicle', 'implement', 'generator', 'other'];
 const STATUSES = ['available', 'in_use', 'maintenance', 'retired'];
@@ -10,7 +11,6 @@ const input = 'mt-1 w-full rounded-xl border border-farm-200 px-3 py-2 text-sm o
 const primaryBtn = 'rounded-full bg-farm-700 px-5 py-2 text-sm font-medium text-white transition hover:bg-farm-800';
 const ghostBtn = 'rounded-full border border-farm-200 px-4 py-2 text-sm font-medium text-slate-500 transition hover:bg-farm-50';
 const label = (s) => s.replace(/_/g, ' ');
-const money = (n) => `$${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const today = () => new Date().toISOString().slice(0, 10);
 const day = (d) => (d ? String(d).slice(0, 10) : '—');
 
@@ -327,7 +327,7 @@ export default function EquipmentManagement() {
                                             onChange={(e) => setForm({ ...form, purchase_date: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-farm-900">Purchase cost ($)</label>
+                                        <label className="block text-sm font-medium text-farm-900">Purchase cost (K)</label>
                                         <input type="number" step="0.01" min="0" className={input} value={form.purchase_cost}
                                             onChange={(e) => setForm({ ...form, purchase_cost: e.target.value })} />
                                     </div>
@@ -373,7 +373,7 @@ export default function EquipmentManagement() {
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-farm-900">Cost ($)</label>
+                                                <label className="block text-sm font-medium text-farm-900">Cost (K)</label>
                                                 <input type="number" step="0.01" min="0" className={input} value={maint.cost}
                                                     onChange={(e) => setMaint({ ...maint, cost: e.target.value })} />
                                             </div>
@@ -436,7 +436,7 @@ export default function EquipmentManagement() {
                                                     onChange={(e) => setFuel({ ...fuel, litres: e.target.value })} />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-farm-900">Cost ($)</label>
+                                                <label className="block text-sm font-medium text-farm-900">Cost (K)</label>
                                                 <input type="number" step="0.01" min="0" className={input} value={fuel.cost}
                                                     onChange={(e) => setFuel({ ...fuel, cost: e.target.value })} />
                                             </div>

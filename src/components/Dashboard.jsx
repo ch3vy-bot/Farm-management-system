@@ -73,7 +73,7 @@ function getSky(date) {
 
 const softShadow = 'shadow-[0_2px_16px_rgba(15,60,35,0.07)]';
 
-function AnimatedNumber({ value, loading }) {
+function AnimatedNumber({ value, loading, prefix = '' }) {
     const target = Number(value ?? 0);
     const [display, setDisplay] = useState(0);
 
@@ -99,7 +99,7 @@ function AnimatedNumber({ value, loading }) {
     if (!Number.isFinite(target)) return <span>{String(value)}</span>;
 
     const shown = Number.isInteger(target) ? Math.round(display) : display;
-    return <span>{shown.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>;
+    return <span>{prefix}{shown.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>;
 }
 
 function Panel({ title, className = '', children }) {
@@ -203,8 +203,8 @@ export default function Dashboard() {
         { label: 'Total fields', icon: 'field', tone: farmTone, value: summary.infrastructure?.fields, roles: ['Admin', 'Manager', 'Accountant', 'Agronomist', 'Worker', 'Farm-owner'] },
         { label: 'Total acreage', icon: 'area', tone: farmTone, value: summary.infrastructure?.total_acreage, roles: ['Admin', 'Manager', 'Accountant', 'Agronomist', 'Worker', 'Farm-owner'] },
         { label: 'Active users', icon: 'users', tone: farmTone, value: summary.infrastructure?.active_users, roles: ['Admin', 'Farm-owner', 'Manager', 'Accountant'] },
-        { label: 'Total expenses', icon: 'wallet', tone: moneyTone, value: summary.financials?.total_expenses, roles: ['Farm-owner', 'Accountant'] },
-        { label: 'Labour costs', icon: 'hardhat', tone: moneyTone, value: summary.financials?.total_labor_cost, roles: ['Farm-owner', 'Manager', 'Accountant'] },
+        { label: 'Total expenses', icon: 'wallet', prefix: 'K', tone: moneyTone, value: summary.financials?.total_expenses, roles: ['Farm-owner', 'Accountant'] },
+        { label: 'Labour costs', icon: 'hardhat', prefix: 'K', tone: moneyTone, value: summary.financials?.total_labor_cost, roles: ['Farm-owner', 'Manager', 'Accountant'] },
         { label: 'Total production', icon: 'wheat', tone: farmTone, value: summary.production?.total_quantity, roles: ['Admin', 'Manager', 'Agronomist', 'Worker', 'Farm-owner'] },
         { label: 'Yield records', icon: 'trend', tone: farmTone, value: summary.production?.yield_records, roles: ['Admin', 'Farm-owner', 'Manager', 'Agronomist', 'Worker'] },
     ].filter(card => card.roles.includes(user?.role));
@@ -376,7 +376,7 @@ export default function Dashboard() {
                                     </span>
                                     <p className="mt-3 text-sm text-slate-500">{card.label}</p>
                                     <p className="mt-0.5 text-2xl font-semibold tracking-tight text-farm-900 tabular-nums">
-                                        <AnimatedNumber value={card.value} loading={loading} />
+                                        <AnimatedNumber value={card.value} loading={loading} prefix={card.prefix} />
                                     </p>
                                 </div>
                             ))}

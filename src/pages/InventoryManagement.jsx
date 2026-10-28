@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import ModuleLayout from '../components/ModuleLayout.jsx';
+import { money } from '../utils/currency.js';
 
 const CATEGORIES = ['seeds', 'fertilizer', 'chemical', 'feed', 'medicine', 'packaging', 'fuel', 'tool'];
 
@@ -230,7 +231,7 @@ export default function InventoryManagement() {
                                         {r.quantity} {r.unit}{isLow(r) && <span className="ml-2 rounded bg-red-100 px-2 py-0.5 text-xs">Low</span>}
                                     </td>
                                     <td className="px-4 py-3 text-slate-500">{r.minimum_stock}</td>
-                                    <td className="px-4 py-3 text-slate-500">${r.unit_cost}</td>
+                                    <td className="px-4 py-3 text-slate-500">{money(r.unit_cost)}</td>
                                     <td className="px-4 py-3 text-slate-500">{r.expiry_date ? r.expiry_date.slice(0, 10) : '—'}</td>
                                     <td className="space-x-3 px-4 py-3 text-right whitespace-nowrap">
                                         <button className="text-farm-700 hover:underline" onClick={() => openStock(r, 'in')}>Stock in</button>
