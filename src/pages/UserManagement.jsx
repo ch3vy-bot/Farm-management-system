@@ -38,7 +38,7 @@ const UserManagement = () => {
 
     const openInvitationModal = () => {
         setEditingUser(null);
-        setNewUser({ name: '', email: '', role: 'Worker' });
+        setNewUser({ name: '', email: '', role: 'Farm-owner' });
         setShowModal(true);
     };
 
@@ -166,7 +166,7 @@ const UserManagement = () => {
                                     required
                                 />
                             </div>
-                            {!editingUser && <p className="rounded-2xl bg-farm-50 p-3 text-sm text-farm-800">The new user will receive an email invitation and choose their own password.</p>}
+                            {!editingUser && <p className="rounded-2xl bg-farm-50 p-3 text-sm text-farm-800">The new user will receive an email invitation and choose their own password. Admins invite Admins and farm owners; farm owners invite their own employees.</p>}
                             <div>
                                 <label className="block text-sm font-medium text-slate-700">Role</label>
                                 <select
@@ -175,10 +175,10 @@ const UserManagement = () => {
                                     onChange={e => setNewUser({...newUser, role: e.target.value})}
                                 >
                                     <option value="Admin">Admin</option>
-                                    <option value="Manager">Manager</option>
-                                    <option value="Agronomist">Agronomist</option>
-                                    <option value="Worker">Worker</option>
-                                    <option value="Accountant">Accountant</option>
+                                    {editingUser && <option value="Manager">Manager</option>}
+                                    {editingUser && <option value="Agronomist">Agronomist</option>}
+                                    {editingUser && <option value="Worker">Worker</option>}
+                                    {editingUser && <option value="Accountant">Accountant</option>}
                                     <option value="Farm-owner">Farm-owner</option>
                                 </select>
                             </div>

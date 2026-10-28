@@ -18,6 +18,9 @@ class UserInvitation extends Model
         'token',
         'expires_at',
         'accepted_at',
+        'farm_id',
+        'hourly_rate',
+        'task_assignment',
     ];
 
     protected function casts(): array

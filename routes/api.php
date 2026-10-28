@@ -60,7 +60,7 @@ Route::middleware(['auth:sanctum', 'farm.access'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::apiResource('users', UserController::class)->except(['store'])->middleware('role:Admin');
-    Route::post('users/invitations', [InvitationController::class, 'store'])->middleware('role:Admin');
+    Route::post('users/invitations', [InvitationController::class, 'store'])->middleware('role:Admin,Farm-owner');
     Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
 
     Route::apiResource('daily-tasks', DailyTaskController::class)->middleware('module:tasks');

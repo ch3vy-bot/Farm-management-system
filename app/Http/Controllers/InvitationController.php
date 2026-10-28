@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Mail\UserInvitationMail;
+use App\Models\Employee;
 use App\Models\User;
 use App\Models\UserInvitation;
 use Illuminate\Http\JsonResponse;
@@ -24,10 +25,28 @@ class InvitationController extends Controller
             ], 503);
         }
 
+        $inviter = $request->user();
+        $isAdmin = $inviter->role === 'Admin';
+
+        // Admins invite other Admins and farm owners. Farm owners invite their own employees.
+        $allowedRoles = $isAdmin
+            ? ['Admin', 'Farm-owner']
+            : ['Manager', 'Agronomist', 'Accountant', 'Worker'];
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
-            'role' => ['required', Rule::in(['Admin', 'Manager', 'Agronomist', 'Worker', 'Accountant', 'Farm-owner'])],
+            'role' => ['required', Rule::in($allowedRoles)],
+            'farm_id' => $isAdmin
+                ? ['prohibited']
+                : ['required', 'integer', Rule::exists('farms', 'id')->where('owner_id', $inviter->id)],
+            'hourly_rate' => $isAdmin ? ['prohibited'] : ['nullable', 'numeric', 'min:0'],
+            'task_assignment' => $isAdmin ? ['prohibited'] : ['nullable', 'string', 'max:255'],
+        ], [
+            'role.in' => $isAdmin
+                ? 'Admins can only invite other Admins and farm owners. Farm owners invite their own employees.'
+                : 'You can invite Managers, Agronomists, Accountants and Workers.',
+            'farm_id.exists' => 'You can only invite employees to a farm that you own.',
         ]);
 
         if (UserInvitation::where('email', $validated['email'])->whereNull('accepted_at')->where('expires_at', '>', now())->exists()) {
@@ -96,6 +115,16 @@ class InvitationController extends Controller
                 'password' => Hash::make($validated['password']),
                 'email_verified_at' => now(),
             ]);
+
+            // Invited by a farm owner: attach the new user to that farm straight away.
+            if ($invitation->farm_id) {
+                Employee::create([
+                    'user_id' => $user->id,
+                    'farm_id' => $invitation->farm_id,
+                    'task_assignment' => $invitation->task_assignment,
+                    'hourly_rate' => $invitation->hourly_rate ?? 0,
+                ]);
+            }
 
             $invitation->update(['accepted_at' => now()]);
 

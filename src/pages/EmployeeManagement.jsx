@@ -4,7 +4,12 @@ import ModuleLayout from '../components/ModuleLayout.jsx';
 import { money } from '../utils/currency.js';
 
 export default function EmployeeManagement() {
-    const { api } = useAuth();
+    const { api, user } = useAuth();
+    const isOwner = user?.role === 'Farm-owner';
+    const [inviteOpen, setInviteOpen] = useState(false);
+    const [inviteSending, setInviteSending] = useState(false);
+    const emptyInvite = { name: '', email: '', role: 'Worker', farm_id: '', task_assignment: '', hourly_rate: '' };
+    const [invite, setInvite] = useState(emptyInvite);
     const [employees, setEmployees] = useState([]);
     const [users, setUsers] = useState([]);
     const [farms, setFarms] = useState([]);
@@ -83,11 +88,39 @@ export default function EmployeeManagement() {
         }
     }
 
+    async function handleInvite(e) {
+        e.preventDefault();
+        setInviteSending(true);
+        try {
+            await api.post('/api/users/invitations', {
+                ...invite,
+                hourly_rate: invite.hourly_rate === '' ? null : invite.hourly_rate,
+                task_assignment: invite.task_assignment || null,
+            });
+            alert(`Invitation sent to ${invite.email}. They will appear in your employee list once they accept.`);
+            setInviteOpen(false);
+            setInvite(emptyInvite);
+        } catch (err) {
+            const errors = err.response?.data?.errors;
+            alert((errors && Object.values(errors).flat()[0]) || err.response?.data?.message || 'Could not send the invitation.');
+        } finally {
+            setInviteSending(false);
+        }
+    }
+
     return (
         <ModuleLayout
           title="Employee Management"
           subtitle="Assign users to farms, define roles, and manage hourly rates."
           actions={<>
+                    {isOwner && (
+                        <button
+                            onClick={() => setInviteOpen(true)}
+                            className="mr-2 rounded-full bg-farm-700 px-5 py-2 text-sm font-medium text-white transition hover:bg-farm-800"
+                        >
+                            + Invite Employee
+                        </button>
+                    )}
 <button
                         onClick={() => handleOpenModal()}
                         className="rounded-full bg-harvest-400 px-5 py-2 text-sm font-medium text-farm-900 transition hover:bg-harvest-500 disabled:opacity-60"
@@ -215,6 +248,101 @@ export default function EmployeeManagement() {
                                         className="rounded-full bg-farm-700 px-5 py-2 text-sm font-medium text-white transition hover:bg-farm-800"
                                     >
                                         {editingEmployee ? 'Update Employee' : 'Assign Employee'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {inviteOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+                        <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
+                            <h2 className="mb-2 text-xl font-semibold text-farm-900">Invite Employee</h2>
+                            <p className="mb-5 text-sm text-slate-500">
+                                They get an email, choose their own password, and are added to the farm you pick.
+                            </p>
+                            <form onSubmit={handleInvite} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-farm-900">Full name</label>
+                                    <input
+                                        className="mt-1 w-full rounded-xl border border-farm-200 px-3 py-2 text-sm outline-none focus:border-farm-500 focus:ring-2 focus:ring-farm-500/20"
+                                        value={invite.name}
+                                        onChange={(e) => setInvite({ ...invite, name: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-farm-900">Email</label>
+                                    <input
+                                        type="email"
+                                        className="mt-1 w-full rounded-xl border border-farm-200 px-3 py-2 text-sm outline-none focus:border-farm-500 focus:ring-2 focus:ring-farm-500/20"
+                                        value={invite.email}
+                                        onChange={(e) => setInvite({ ...invite, email: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-farm-900">Role</label>
+                                    <select
+                                        className="mt-1 w-full rounded-xl border border-farm-200 px-3 py-2 text-sm outline-none focus:border-farm-500 focus:ring-2 focus:ring-farm-500/20"
+                                        value={invite.role}
+                                        onChange={(e) => setInvite({ ...invite, role: e.target.value })}
+                                    >
+                                        <option value="Worker">Worker</option>
+                                        <option value="Agronomist">Agronomist</option>
+                                        <option value="Accountant">Accountant</option>
+                                        <option value="Manager">Manager</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-farm-900">Farm</label>
+                                    <select
+                                        className="mt-1 w-full rounded-xl border border-farm-200 px-3 py-2 text-sm outline-none focus:border-farm-500 focus:ring-2 focus:ring-farm-500/20"
+                                        value={invite.farm_id}
+                                        onChange={(e) => setInvite({ ...invite, farm_id: e.target.value })}
+                                        required
+                                    >
+                                        <option value="">Choose a farm...</option>
+                                        {farms.map((f) => (
+                                            <option key={f.id} value={f.id}>{f.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-farm-900">Task assignment (optional)</label>
+                                    <input
+                                        className="mt-1 w-full rounded-xl border border-farm-200 px-3 py-2 text-sm outline-none focus:border-farm-500 focus:ring-2 focus:ring-farm-500/20"
+                                        placeholder="e.g. Irrigation Operator, Harvester"
+                                        value={invite.task_assignment}
+                                        onChange={(e) => setInvite({ ...invite, task_assignment: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-farm-900">Hourly rate in K (optional)</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        className="mt-1 w-full rounded-xl border border-farm-200 px-3 py-2 text-sm outline-none focus:border-farm-500 focus:ring-2 focus:ring-farm-500/20"
+                                        value={invite.hourly_rate}
+                                        onChange={(e) => setInvite({ ...invite, hourly_rate: e.target.value })}
+                                    />
+                                </div>
+                                <div className="mt-6 flex justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setInviteOpen(false)}
+                                        className="rounded-full border border-farm-200 px-4 py-2 text-sm font-medium text-slate-500 transition hover:bg-farm-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={inviteSending}
+                                        className="rounded-full bg-farm-700 px-5 py-2 text-sm font-medium text-white transition hover:bg-farm-800 disabled:opacity-60"
+                                    >
+                                        {inviteSending ? 'Sending...' : 'Send Invitation'}
                                     </button>
                                 </div>
                             </form>
